@@ -5,10 +5,12 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
+import android.text.TextUtils;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -27,6 +29,13 @@ import org.edx.mobile.util.ConfigUtil;
 import org.edx.mobile.util.FileUtil;
 import org.edx.mobile.util.NetworkUtil;
 import org.edx.mobile.util.links.WebViewLink;
+import org.edx.mobile.view.custom.cache.offline.Destroyable;
+import org.edx.mobile.view.custom.cache.FastOpenApi;
+import org.edx.mobile.view.custom.cache.config.CacheConfig;
+import org.edx.mobile.view.custom.cache.config.FastCacheMode;
+import org.edx.mobile.view.custom.cache.offline.ResourceInterceptor;
+import org.edx.mobile.view.custom.cache.WebViewCache;
+import org.edx.mobile.view.custom.cache.WebViewCacheImpl;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +60,7 @@ import dagger.hilt.android.qualifiers.ActivityContext;
  * than the current one, then treats it as an external link and may open in external browser.
  */
 @Singleton
-public class URLInterceptorWebViewClient extends WebViewClient {
+public class URLInterceptorWebViewClient extends WebViewClient implements FastOpenApi, Destroyable {
 
     private final Logger logger = new Logger(URLInterceptorWebViewClient.class);
     private final FragmentActivity activity;
@@ -63,6 +72,13 @@ public class URLInterceptorWebViewClient extends WebViewClient {
     private boolean ajaxInterceptorEmbed = false;
     Config config;
     AnalyticsRegistry analyticsRegistry;
+
+    private static final String SCHEME_HTTP = "http";
+    private static final String SCHEME_HTTPS = "https";
+    private static final String METHOD_GET = "GET";
+    private WebViewCache mWebViewCache;
+    private final int mWebViewCacheMode;
+    private final String mUserAgent;
 
     /**
      * Tells if the page loading has been finished or not.
@@ -98,6 +114,11 @@ public class URLInterceptorWebViewClient extends WebViewClient {
         this.interceptAjaxRequest = interceptAjaxRequest;
         this.completionCallback = completionCallback;
         setupWebView(webView);
+        WebSettings settings = webView.getSettings();
+        mWebViewCacheMode = settings.getCacheMode();
+        mUserAgent = settings.getUserAgentString();
+        mWebViewCache = new WebViewCacheImpl(webView.getContext());
+
     }
 
     /**
@@ -213,15 +234,19 @@ public class URLInterceptorWebViewClient extends WebViewClient {
     @Deprecated
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, String url) {
-        return shouldOverrideUrlLoadingWrapper(url);
+        //view.loadurl(url);
+        //return true;
+        return shouldOverrideUrlLoadingWrapper(view, url);
     }
 
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-        return shouldOverrideUrlLoadingWrapper(request.getUrl().toString());
+        //view.loadurl(request.getUrl().toString());
+        //return true;
+        return shouldOverrideUrlLoadingWrapper(view, request.getUrl().toString());
     }
 
-    private boolean shouldOverrideUrlLoadingWrapper(String url) {
+    private boolean shouldOverrideUrlLoadingWrapper(WebView view, String url) {
         if (actionListener == null) {
             logger.warn("you have not set IActionLister to this WebViewClient, " +
                     "you might miss some event");
@@ -229,15 +254,21 @@ public class URLInterceptorWebViewClient extends WebViewClient {
         logger.debug("loading: " + url);
         if (parseRecognizedLinkAndCallListener(url)) {
             // we handled this URL
+            view.loadUrl(url);
             return true;
+            //return true;
         } else if (loadingInitialUrl && !loadingFinished) {
             // Server has redirected the initial url to other hosting url, in this case no need to
             // redirect the user to external browser.
             // For more details see LEARNER-6596
             // Return false means the current WebView handles the url.
-            return false;
+            view.loadUrl(url);
+            return true;
+            //return false;
         } else if (isInternalLink(url)) {
-            return false;
+            view.loadUrl(url);
+            return true;
+            //return false;
         } else if (isAllLinksExternal || isExternalLink(url)) {
             // open URL in external web browser
             // return true means the host application handles the url
@@ -246,7 +277,9 @@ public class URLInterceptorWebViewClient extends WebViewClient {
             return true;
         } else {
             // return false means the current WebView handles the url.
-            return false;
+            view.loadUrl(url);
+            return true;
+            //return false;
         }
     }
 
@@ -299,7 +332,51 @@ public class URLInterceptorWebViewClient extends WebViewClient {
                 && NetworkUtil.isConnectedMobile(context)) {
             return new WebResourceResponse("text/html", StandardCharsets.UTF_8.name(), null);
         }
-        return super.shouldInterceptRequest(view, request);
+        return onIntercept(view, request);
+        //return super.shouldInterceptRequest(view, request);
+    }
+
+    private WebResourceResponse onIntercept(WebView view, WebResourceRequest request) {
+        //if (mDelegate != null) {
+        //    WebResourceResponse response = mDelegate.shouldInterceptRequest(view, request);
+        //    if (response != null) {
+        //        return response;
+        ///    }
+        //}
+        return loadFromWebViewCache(request);
+    }
+
+    private WebResourceResponse loadFromWebViewCache(WebResourceRequest request) {
+        String scheme = request.getUrl().getScheme().trim();
+        String method = request.getMethod().trim();
+        if ((TextUtils.equals(SCHEME_HTTP, scheme)
+                || TextUtils.equals(SCHEME_HTTPS, scheme))
+                && method.equalsIgnoreCase(METHOD_GET)) {
+
+            return mWebViewCache.getResource(request, mWebViewCacheMode, mUserAgent);
+        }
+        return null;
+    }
+
+    @Override
+    public void setCacheMode(FastCacheMode mode, CacheConfig cacheConfig) {
+        if (mWebViewCache != null) {
+            mWebViewCache.setCacheMode(mode, cacheConfig);
+        }
+    }
+
+    @Override
+    public void addResourceInterceptor(ResourceInterceptor interceptor) {
+        if (mWebViewCache != null) {
+            mWebViewCache.addResourceInterceptor(interceptor);
+        }
+    }
+
+    @Override
+    public void destroy() {
+        if (mWebViewCache != null) {
+            mWebViewCache.destroy();
+        }
     }
 
     /**
