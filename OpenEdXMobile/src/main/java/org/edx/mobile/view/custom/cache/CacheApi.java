@@ -10,7 +10,7 @@ import org.edx.mobile.view.custom.cache.offline.ResourceInterceptor;
  */
 public interface CacheApi {
 
-    void setCacheMode(FastCacheMode mode, CacheConfig cacheConfig);
+//    void setCacheMode(FastCacheMode mode, CacheConfig cacheConfig);
 
     void addResourceInterceptor(ResourceInterceptor interceptor);
 }
