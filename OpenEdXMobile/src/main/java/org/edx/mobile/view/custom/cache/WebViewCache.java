@@ -35,7 +35,9 @@ public interface WebViewCache extends CacheApi, Destroyable {
       
         private final Context context;
         private EdxWebView edxWebView;
-      
+        private FastCacheMode mFastCacheMode;
+        private CacheConfig mCacheConfig;
+        private OfflineServer mOfflineServer;
       
         @Inject
         public Impl(@ApplicationContext Context context) {
@@ -72,7 +74,7 @@ public interface WebViewCache extends CacheApi, Destroyable {
       
         private synchronized OfflineServer getOfflineServer() {
             if (mOfflineServer == null) {
-                mOfflineServer = new OfflineServerImpl(mContext, getCacheConfig());
+                mOfflineServer = new OfflineServer(context, getCacheConfig());
             }
             return mOfflineServer;
         }
@@ -83,7 +85,7 @@ public interface WebViewCache extends CacheApi, Destroyable {
       
         private CacheConfig generateDefaultCacheConfig() {
             return new CacheConfig.Builder(context)
-                .setCacheDir(getExternalCacheDir() + File.separator + "authWebViewCache")
+                .setCacheDir(context.getExternalCacheDir() + File.separator + "authWebViewCache")
                 .setExtensionFilter(new CustomMimeTypeFilter())
                 .build();
         }
@@ -102,7 +104,7 @@ public interface WebViewCache extends CacheApi, Destroyable {
             // help gc
             mCacheConfig = null;
             mOfflineServer = null;
-            mContext = null;
+//            mContext = null;
         }
     }
 
