@@ -45,6 +45,9 @@ import org.edx.mobile.util.WebViewUtil;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
+import org.edx.mobile.view.custom.cache.offline.Chain;
+import org.edx.mobile.view.custom.cache.offline.ResourceInterceptor;
+import org.edx.mobile.view.custom.cache.*;
 /**
  * A custom webview which authenticates the user before loading a page,
  * Javascript can also be passed in arguments for evaluation.
@@ -61,6 +64,11 @@ public class AuthenticatedWebView extends FrameLayout implements RefreshListener
     private boolean isManuallyReloadable;
     private AuthenticatedWebviewBinding binding;
 
+    private WebViewCache mWebViewCache;
+    private static final String SCHEME_HTTP = "http";
+    private static final String SCHEME_HTTPS = "https";
+    private static final String METHOD_GET = "GET";
+    
     public AuthenticatedWebView(Context context) {
         super(context);
         init();
@@ -106,8 +114,9 @@ public class AuthenticatedWebView extends FrameLayout implements RefreshListener
                             URLInterceptorWebViewClient.CompletionCallback completionCallback, OverridePageUrlCallback pageUrlCallback) {
         this.isManuallyReloadable = isManuallyReloadable;
         binding.webview.getSettings().setJavaScriptEnabled(true);
+        mWebViewCache = new WebViewCache(getContext());
         addResourceInterceptor(new ResourceInterceptor() {
-            @Override
+//            @Override
             public WebResource load(Chain chain) {
                 return chain.process(chain.getRequest());
             }
