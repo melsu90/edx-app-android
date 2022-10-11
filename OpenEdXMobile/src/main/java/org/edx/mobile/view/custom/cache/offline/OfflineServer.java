@@ -1,4 +1,4 @@
-package org.edx.mobile.view.custom.cache;
+package org.edx.mobile.view.custom.cache.offline;
 
 import android.content.Context;
 import android.webkit.WebResourceResponse;
