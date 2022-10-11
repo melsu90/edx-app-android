@@ -46,7 +46,7 @@ public interface OfflineServer {
             @Override
             public WebResourceResponse get(CacheRequest request) {
 //                boolean isForceMode = request.isForceMode();
-                Context context = mContext;
+//                Context context = mContext;
                 CacheConfig config = mCacheConfig;
 //                List<ResourceInterceptor> interceptors = isForceMode ? buildForceModeChain(context, config) : buildDefaultModeChain(context);
                 List<ResourceInterceptor> interceptors = buildForceModeChain(context, config);
