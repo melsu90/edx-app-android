@@ -16,7 +16,7 @@ import org.edx.mobile.view.custom.cache.config.CacheConfig;
 import org.edx.mobile.view.custom.cache.config.FastCacheMode;
 import org.edx.mobile.view.custom.cache.offline.CacheRequest;
 import org.edx.mobile.view.custom.cache.offline.OfflineServer;
-import org.edx.mobile.view.custom.cache.offline.OfflineServerImpl;
+//import org.edx.mobile.view.custom.cache.offline.OfflineServerImpl;
 import org.edx.mobile.view.custom.cache.offline.ResourceInterceptor;
 import org.edx.mobile.view.custom.cache.utils.MimeTypeMapUtils;
 
