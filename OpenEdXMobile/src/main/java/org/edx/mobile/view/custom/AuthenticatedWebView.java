@@ -106,6 +106,12 @@ public class AuthenticatedWebView extends FrameLayout implements RefreshListener
                             URLInterceptorWebViewClient.CompletionCallback completionCallback, OverridePageUrlCallback pageUrlCallback) {
         this.isManuallyReloadable = isManuallyReloadable;
         binding.webview.getSettings().setJavaScriptEnabled(true);
+        addResourceInterceptor(new ResourceInterceptor() {
+            @Override
+            public WebResource load(Chain chain) {
+                return chain.process(chain.getRequest());
+            }
+        });        
         webViewClient = new URLInterceptorWebViewClient(fragmentActivity, binding.webview, interceptAjaxRequest,
                 completionCallback) {
             @Override
@@ -149,15 +155,15 @@ public class AuthenticatedWebView extends FrameLayout implements RefreshListener
             @Deprecated
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return shouldOverrideUrlLoadingWrapper(Uri.parse(url)) || super.shouldOverrideUrlLoading(view, url);
+                return shouldOverrideUrlLoadingWrapper(view, Uri.parse(url)) || super.shouldOverrideUrlLoading(view, url);
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return shouldOverrideUrlLoadingWrapper(request.getUrl()) || super.shouldOverrideUrlLoading(view, request);
+                return shouldOverrideUrlLoadingWrapper(view, request.getUrl()) || super.shouldOverrideUrlLoading(view, request);
             }
 
-            public boolean shouldOverrideUrlLoadingWrapper(@NonNull Uri uri) {
+            public boolean shouldOverrideUrlLoadingWrapper(@NonNull WebView view, @NonNull Uri uri) {
                 String overrideUrl = uri.toString();
                 if (overrideUrl.contains("logout")) {
                     forceLogoutUser();
@@ -169,8 +175,27 @@ public class AuthenticatedWebView extends FrameLayout implements RefreshListener
                 } else if (overrideUrl.contains("dismiss")) {
                     pageUrlCallback.onUrlClick(true, uri.getQueryParameter("screen_name"));
                     return true;
+                } else if (overrideUrl.contains("logout")) {
+                    view.loadUrl(overrideUrl);
+                    return true;
                 }
                 return false;
+            }
+            
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                return loadFromWebViewCache(request);
+            }
+
+            private WebResourceResponse loadFromWebViewCache(WebResourceRequest request) {
+                String scheme = request.getUrl().getScheme().trim();
+                String method = request.getMethod().trim();
+                if ((TextUtils.equals(SCHEME_HTTP, scheme)
+                        || TextUtils.equals(SCHEME_HTTPS, scheme))
+                        && method.equalsIgnoreCase(METHOD_GET)) {
+                    return mWebViewCache.getResource(request);
+                }
+                return null;
             }
 
             public void onPageFinished(WebView view, String url) {
@@ -198,6 +223,12 @@ public class AuthenticatedWebView extends FrameLayout implements RefreshListener
                     hideLoadingProgress();
                 }
                 super.onPageFinished(view, url);
+            }
+            
+            public void addResourceInterceptor(ResourceInterceptor interceptor) {
+                if (mWebViewCache != null) {
+                    mWebViewCache.addResourceInterceptor(interceptor);
+                }
             }
         };
 
